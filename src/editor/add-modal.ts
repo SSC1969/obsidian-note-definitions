@@ -70,6 +70,7 @@ export class AddDefinitionModal {
 			},
 		});
 
+		// create definition file picker
 		const defManager = getDefFileManager();
 		this.defFilePickerSetting = new Setting(this.modal.contentEl)
 			.setName("Definition file")
@@ -143,7 +144,16 @@ export class AddDefinitionModal {
 			text: "Save",
 			cls: "edit-modal-save-button",
 		});
+
 		button.addEventListener("click", () => {
+			this.try_submit(phraseText, defText, aliasText);
+		});
+
+		// set up key event listeners for closing and submitting the modal
+		this.modal.scope.register([], "Escape", () => {
+			this.modal.close();
+		});
+		this.modal.scope.register(["Mod"], "Enter", () => {
 			this.try_submit(phraseText, defText, aliasText);
 		});
 
