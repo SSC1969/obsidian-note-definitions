@@ -72,6 +72,42 @@ export class AddDefinitionModal {
 
 		// create definition file picker
 		const defManager = getDefFileManager();
+
+		// get the currently opened file's first folder and first file, if they exist
+		let default_def_file = "";
+		let default_def_folder = "";
+		let paths: Array<string> = [];
+
+		// if the currently open file has at least one definition context, use it's
+		// first context as the initial value
+		if (this.activeFile) {
+			const metadataCache = this.app.metadataCache.getFileCache(
+				this.activeFile,
+			);
+			paths = metadataCache?.frontmatter?.[DEF_CTX_FM_KEY];
+			if (paths) {
+				// get the first folder in the path (if it exists) - use regexp to remove the trailing
+				// `/` that might be present
+				default_def_folder =
+					paths.find(
+						(path: string) =>
+							this.app.vault.getFolderByPath(
+								path.replace(/\/+$/, ""),
+							) != null,
+					) || "";
+				if (default_def_folder) {
+					default_def_folder = default_def_folder.replace(/\/+$/, "");
+				}
+
+				// get the first file in the path (if it exists)
+				default_def_file =
+					paths.find(
+						(path: string) =>
+							this.app.vault.getFileByPath(path) != null,
+					) || "";
+			}
+		}
+
 		this.defFilePickerSetting = new Setting(this.modal.contentEl)
 			.setName("Definition file")
 			.addDropdown((component) => {
@@ -80,26 +116,14 @@ export class AddDefinitionModal {
 					component.addOption(file.path, file.path);
 				});
 
-				// set an initial value for the file picker
-				if (defFiles.length > 0) {
-					// default to using the first definition file in the defs folder
-					let val = defFiles[0].path;
-
-					// if the currently open file has at least one definition context, use it's
-					// first context as the initial value
-					if (this.activeFile) {
-						const metadataCache =
-							this.app.metadataCache.getFileCache(
-								this.activeFile,
-							);
-						const paths =
-							metadataCache?.frontmatter?.[DEF_CTX_FM_KEY];
-						if (paths) {
-							val = paths[0];
-						}
-					}
-					component.setValue(val);
+				// use the first definition file from this file's metadata, or default to
+				// the first folder in the list if it exists
+				if (default_def_file) {
+					component.setValue(default_def_file);
+				} else if (defFiles.length > 0) {
+					component.setValue(defFiles[0].path);
 				}
+
 				this.defFilePicker = component;
 			});
 
@@ -110,9 +134,15 @@ export class AddDefinitionModal {
 				defFolders.forEach((folder) => {
 					component.addOption(folder.path, folder.path + "/");
 				});
-				if (defFolders.length > 0) {
+
+				// use the first definition folder from this file's metadata, or default to
+				// the first folder in the list if it exists
+				if (default_def_folder) {
+					component.setValue(default_def_folder);
+				} else if (defFolders.length > 0) {
 					component.setValue(defFolders[0].path);
 				}
+
 				this.atomicFolderPicker = component;
 			});
 
@@ -131,10 +161,29 @@ export class AddDefinitionModal {
 
 				component.addOption(DefFileType.Consolidated, "Consolidated");
 				component.addOption(DefFileType.Atomic, "Atomic");
+
+				// use the default definition type as a fallback
 				component.setValue(
 					window.NoteDefinition.settings.defFileParseConfig
 						.defaultFileType,
 				);
+
+				// attempt to automatically determine the definition type we should use if there
+				// is at least one item in the definition context and the setting is enabled
+				if (
+					window.NoteDefinition.settings.defModalsConfig
+						.automaticallyDetermineNewDefTypes &&
+					paths
+				) {
+					// automatically determine the definition file type to default to based on
+					// the first item in the definition context list
+					if (paths[0] == default_def_file) {
+						component.setValue("consolidated");
+					} else if (paths[0] == default_def_folder + "/") {
+						component.setValue("atomic");
+					}
+				}
+
 				component.onChange(handleDefFileTypeChange);
 				handleDefFileTypeChange(component.getValue());
 				this.fileTypePicker = component;
