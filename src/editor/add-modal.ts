@@ -199,9 +199,6 @@ export class AddDefinitionModal {
 		});
 
 		// set up key event listeners for closing and submitting the modal
-		// this.modal.scope.register([], "Escape", () => {
-		// 	this.modal.close();
-		// });
 		this.modal.scope.register(["Mod"], "Enter", () => {
 			this.try_submit(phraseText, defText, aliasText);
 		});
