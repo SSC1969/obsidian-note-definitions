@@ -35,6 +35,8 @@ export class AddDefinitionModal {
 		this.activeFile = this.app.workspace.getActiveFile();
 
 		this.submitting = false;
+
+		// create modal content
 		this.modal.setTitle("Add Definition");
 		this.modal.contentEl.createDiv({
 			cls: "edit-modal-section-header",
@@ -142,62 +144,71 @@ export class AddDefinitionModal {
 			cls: "edit-modal-save-button",
 		});
 		button.addEventListener("click", () => {
-			if (this.submitting) {
-				return;
-			}
-			if (!phraseText.value || !defText.value) {
-				new Notice("Please fill in a definition value");
-				return;
-			}
-
-			const fileType = this.fileTypePicker.getValue();
-			let selectedPath = "";
-			let definitionFile;
-
-			if (fileType === DefFileType.Consolidated) {
-				selectedPath = this.defFilePicker.getValue();
-				if (!selectedPath) {
-					new Notice(
-						"Please choose a definition file. If you do not have any definition files, please create one.",
-					);
-					return;
-				}
-				const defFileManager = getDefFileManager();
-				definitionFile =
-					defFileManager.globalDefFiles.get(selectedPath);
-			} else if (fileType === DefFileType.Atomic) {
-				selectedPath = this.atomicFolderPicker.getValue();
-				if (!selectedPath) {
-					new Notice(
-						"Please choose a folder for the atomic definition.",
-					);
-					return;
-				}
-				definitionFile = undefined;
-			} else {
-				new Notice("Invalid file type selected.");
-				return;
-			}
-
-			const updated = new DefFileUpdater(this.app);
-			updated.addDefinition(
-				{
-					fileType: fileType as DefFileType,
-					key: phraseText.value.toLowerCase(),
-					word: phraseText.value,
-					aliases: aliasText.value
-						? aliasText.value
-							.split(",")
-							.map((alias) => alias.trim())
-						: [],
-					definition: defText.value,
-					file: definitionFile,
-				},
-				selectedPath,
-			);
-			this.modal.close();
+			this.try_submit(phraseText, defText, aliasText);
 		});
 
 		this.modal.open();
+	}
+
+	// Checks if the requirements for a definition (name, description, file) have been met,
+	// showing an error notification if they haven't. Creates the definition and closes the modal
+	// if there aren't any issues.
+	try_submit(
+		phraseText: HTMLTextAreaElement,
+		defText: HTMLTextAreaElement,
+		aliasText: HTMLTextAreaElement,
+	) {
+		// we're already submitting the definition
+		if (this.submitting) {
+			return;
+		}
+
+		// invalid definition paramters (missing name or description)
+		if (!phraseText.value || !defText.value) {
+			new Notice("Please fill in a definition value");
+			return;
+		}
+
+		const fileType = this.fileTypePicker.getValue();
+		let selectedPath = "";
+		let definitionFile;
+
+		if (fileType === DefFileType.Consolidated) {
+			selectedPath = this.defFilePicker.getValue();
+			if (!selectedPath) {
+				new Notice(
+					"Please choose a definition file. If you do not have any definition files, please create one.",
+				);
+				return;
+			}
+			const defFileManager = getDefFileManager();
+			definitionFile = defFileManager.globalDefFiles.get(selectedPath);
+		} else if (fileType === DefFileType.Atomic) {
+			selectedPath = this.atomicFolderPicker.getValue();
+			if (!selectedPath) {
+				new Notice("Please choose a folder for the atomic definition.");
+				return;
+			}
+			definitionFile = undefined;
+		} else {
+			new Notice("Invalid file type selected.");
+			return;
+		}
+
+		const updated = new DefFileUpdater(this.app);
+		updated.addDefinition(
+			{
+				fileType: fileType as DefFileType,
+				key: phraseText.value.toLowerCase(),
+				word: phraseText.value,
+				aliases: aliasText.value
+					? aliasText.value.split(",").map((alias) => alias.trim())
+					: [],
+				definition: defText.value,
+				file: definitionFile,
+			},
+			selectedPath,
+		);
+		this.modal.close();
 	}
 }
