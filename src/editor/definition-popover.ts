@@ -1,4 +1,12 @@
-import { App, Component, MarkdownRenderer, MarkdownView, normalizePath, Plugin } from "obsidian";
+import {
+	App,
+	ButtonComponent,
+	Component,
+	MarkdownRenderer,
+	MarkdownView,
+	normalizePath,
+	Plugin,
+} from "obsidian";
 import { Definition } from "src/core/model";
 import { getSettings, PopoverDismissType } from "src/settings";
 import { logDebug, logError } from "src/util/log";
@@ -15,7 +23,7 @@ interface Coordinates {
 }
 
 export class DefinitionPopover extends Component {
-	app: App
+	app: App;
 	plugin: Plugin;
 	// Code mirror editor object for capturing vim events
 	cmEditor: any;
@@ -37,7 +45,7 @@ export class DefinitionPopover extends Component {
 
 		if (!this.mountedPopover) {
 			logError("Mounting definition popover failed");
-			return
+			return;
 		}
 
 		this.registerClosePopoverListeners();
@@ -50,7 +58,7 @@ export class DefinitionPopover extends Component {
 
 		if (!this.mountedPopover) {
 			logError("mounting definition popover failed");
-			return
+			return;
 		}
 		this.registerClosePopoverListeners();
 	}
@@ -65,43 +73,66 @@ export class DefinitionPopover extends Component {
 
 	close = () => {
 		this.unmount();
-	}
+	};
 
 	clickClose = () => {
 		if (this.mountedPopover?.matches(":hover")) {
 			return;
 		}
 		this.close();
-	}
+	};
 
 	private getCmEditor(app: App) {
 		const activeView = app.workspace.getActiveViewOfType(MarkdownView);
 		const cmEditor = (activeView as any)?.editMode?.editor?.cm?.cm;
 		if (!cmEditor) {
-			logDebug("cmEditor object not found, will not handle vim events for definition popover");
+			logDebug(
+				"cmEditor object not found, will not handle vim events for definition popover",
+			);
 		}
 		return cmEditor;
 	}
 
-	private shouldOpenToLeft(horizontalOffset: number, containerStyle: CSSStyleDeclaration): boolean {
+	private shouldOpenToLeft(
+		horizontalOffset: number,
+		containerStyle: CSSStyleDeclaration,
+	): boolean {
 		return horizontalOffset > parseInt(containerStyle.width) / 2;
 	}
 
-	private shouldOpenUpwards(verticalOffset: number, containerStyle: CSSStyleDeclaration): boolean {
+	private shouldOpenUpwards(
+		verticalOffset: number,
+		containerStyle: CSSStyleDeclaration,
+	): boolean {
 		return verticalOffset > parseInt(containerStyle.height) / 2;
 	}
 
-	// Creates popover element and its children, without displaying it 
-	private createElement(def: Definition, parent: HTMLElement): HTMLDivElement {
+	// Creates popover element and its children, without displaying it
+	private createElement(
+		def: Definition,
+		parent: HTMLElement,
+	): HTMLDivElement {
 		const popoverSettings = getSettings().defPopoverConfig;
 		const el = parent.createEl("div", {
 			cls: "definition-popover",
 			attr: {
 				id: DEF_POPOVER_ID,
-				style: `visibility:hidden;${popoverSettings.backgroundColour ? 
-`background-color: ${popoverSettings.backgroundColour};` : ''}`
+				style: `visibility:hidden;${
+					popoverSettings.backgroundColour
+						? `background-color: ${popoverSettings.backgroundColour};`
+						: ""
+				}`,
 			},
 		});
+
+		// create a button linking to the definition
+		new ButtonComponent(el)
+			.setIcon("arrow-left-from-line")
+			.setTooltip("Go to definition")
+			.setClass("popover-go-to-def-button")
+			.onClick(() => {
+				this.app.workspace.openLinkText(def.linkText, "");
+			});
 
 		el.createEl("h2", { text: def.word });
 		if (def.aliases.length > 0 && popoverSettings.displayAliases) {
@@ -111,14 +142,19 @@ export class DefinitionPopover extends Component {
 		contentEl.setAttr("ctx", "def-popup");
 
 		const currComponent = this;
-		MarkdownRenderer.render(this.app, def.definition, contentEl, 
-			normalizePath(def.file.path), currComponent);
+		MarkdownRenderer.render(
+			this.app,
+			def.definition,
+			contentEl,
+			normalizePath(def.file.path),
+			currComponent,
+		);
 		this.postprocessMarkdown(contentEl, def);
 
 		if (popoverSettings.displayDefFileName) {
 			el.createEl("div", {
 				text: def.file.basename,
-				cls: 'definition-popover-filename'
+				cls: "definition-popover-filename",
 			});
 		}
 		return el;
@@ -131,15 +167,17 @@ export class DefinitionPopover extends Component {
 		for (let i = 0; i < internalLinks.length; i++) {
 			const linkEl = internalLinks.item(i);
 			if (linkEl) {
-				linkEl.addEventListener('click', e => {
+				linkEl.addEventListener("click", (e) => {
 					e.preventDefault();
-					const file = this.app.metadataCache.getFirstLinkpathDest(linkEl.getAttr("href") ?? '', 
-						normalizePath(def.file.path))
+					const file = this.app.metadataCache.getFirstLinkpathDest(
+						linkEl.getAttr("href") ?? "",
+						normalizePath(def.file.path),
+					);
 					this.unmount();
 					if (!file) {
 						return;
 					}
-					this.app.workspace.getLeaf().openFile(file)
+					this.app.workspace.getLeaf().openFile(file);
 				});
 			}
 		}
@@ -150,26 +188,31 @@ export class DefinitionPopover extends Component {
 		try {
 			cursorCoords = this.getCursorCoords();
 		} catch (e) {
-			logError("Could not open definition popover - could not get cursor coordinates");
-			return
+			logError(
+				"Could not open definition popover - could not get cursor coordinates",
+			);
+			return;
 		}
 
 		this.mountAtCoordinates(def, cursorCoords);
 	}
 
 	// Offset coordinates from viewport coordinates to coordinates relative to the parent container element
-	private offsetCoordsToContainer(coords: Coordinates, container: HTMLElement): Coordinates {
+	private offsetCoordsToContainer(
+		coords: Coordinates,
+		container: HTMLElement,
+	): Coordinates {
 		const containerRect = container.getBoundingClientRect();
 		return {
 			left: coords.left - containerRect.left,
 			right: coords.right - containerRect.left,
 			top: coords.top - containerRect.top,
-			bottom: coords.bottom - containerRect.top
-		}
+			bottom: coords.bottom - containerRect.top,
+		};
 	}
 
 	private mountAtCoordinates(def: Definition, coords: Coordinates) {
-		const mdView = this.app.workspace.getActiveViewOfType(MarkdownView)
+		const mdView = this.app.workspace.getActiveViewOfType(MarkdownView);
 		if (!mdView) {
 			logError("Could not mount popover: No active markdown view found");
 			return;
@@ -186,22 +229,27 @@ export class DefinitionPopover extends Component {
 		}
 		const popoverSettings = getSettings().defPopoverConfig;
 		const containerStyle = getComputedStyle(mdView.containerEl);
-		const matchedClasses = mdView.containerEl.getElementsByClassName("view-header");
+		const matchedClasses =
+			mdView.containerEl.getElementsByClassName("view-header");
 		// The container div has a header element that needs to be accounted for
 		let offsetHeaderHeight = 0;
 		if (matchedClasses.length > 0) {
-			offsetHeaderHeight = parseInt(getComputedStyle(matchedClasses[0]).height);
+			offsetHeaderHeight = parseInt(
+				getComputedStyle(matchedClasses[0]).height,
+			);
 		}
 
 		// Offset coordinates to be relative to container
 		coords = this.offsetCoordsToContainer(coords, mdView.containerEl);
 
 		const positionStyle: Partial<CSSStyleDeclaration> = {
-			visibility: 'visible',
+			visibility: "visible",
 		};
 
-		positionStyle.maxWidth = popoverSettings.enableCustomSize && popoverSettings.maxWidth ? 
-			`${popoverSettings.maxWidth}px` : `${parseInt(containerStyle.width) / 2}px`;
+		positionStyle.maxWidth =
+			popoverSettings.enableCustomSize && popoverSettings.maxWidth
+				? `${popoverSettings.maxWidth}px`
+				: `${parseInt(containerStyle.width) / 2}px`;
 		if (this.shouldOpenToLeft(coords.left, containerStyle)) {
 			positionStyle.right = `${parseInt(containerStyle.width) - coords.right}px`;
 		} else {
@@ -210,12 +258,16 @@ export class DefinitionPopover extends Component {
 
 		if (this.shouldOpenUpwards(coords.top, containerStyle)) {
 			positionStyle.bottom = `${parseInt(containerStyle.height) - coords.top}px`;
-			positionStyle.maxHeight = popoverSettings.enableCustomSize && popoverSettings.maxHeight ? 
-				`${popoverSettings.maxHeight}px` : `${coords.top - offsetHeaderHeight}px`;
+			positionStyle.maxHeight =
+				popoverSettings.enableCustomSize && popoverSettings.maxHeight
+					? `${popoverSettings.maxHeight}px`
+					: `${coords.top - offsetHeaderHeight}px`;
 		} else {
 			positionStyle.top = `${coords.bottom}px`;
-			positionStyle.maxHeight = popoverSettings.enableCustomSize && popoverSettings.maxHeight ?
-				`${popoverSettings.maxHeight}px` : `${parseInt(containerStyle.height) - coords.bottom}px`;
+			positionStyle.maxHeight =
+				popoverSettings.enableCustomSize && popoverSettings.maxHeight
+					? `${popoverSettings.maxHeight}px`
+					: `${parseInt(containerStyle.height) - coords.bottom}px`;
 		}
 
 		this.mountedPopover.setCssStyles(positionStyle);
@@ -224,7 +276,7 @@ export class DefinitionPopover extends Component {
 	private unmount() {
 		if (!this.mountedPopover) {
 			logDebug("Nothing to unmount, could not find popover element");
-			return
+			return;
 		}
 		this.mountedPopover.remove();
 		this.mountedPopover = undefined;
@@ -237,17 +289,29 @@ export class DefinitionPopover extends Component {
 	private getCursorCoords(): Coordinates {
 		const editor = this.app.workspace.activeEditor?.editor;
 		// @ts-ignore
-		return editor?.cm?.coordsAtPos(editor?.posToOffset(editor?.getCursor()), -1);
+		return editor?.cm?.coordsAtPos(
+			editor?.posToOffset(editor?.getCursor()),
+			-1,
+		);
 	}
 
 	private registerClosePopoverListeners() {
-		this.getActiveView()?.containerEl.addEventListener("keypress", this.close);
-		this.getActiveView()?.containerEl.addEventListener("click", this.clickClose);
-		
+		this.getActiveView()?.containerEl.addEventListener(
+			"keypress",
+			this.close,
+		);
+		this.getActiveView()?.containerEl.addEventListener(
+			"click",
+			this.clickClose,
+		);
+
 		if (this.mountedPopover) {
 			this.mountedPopover.addEventListener("mouseleave", () => {
 				const popoverSettings = getSettings().defPopoverConfig;
-				if (popoverSettings.popoverDismissEvent === PopoverDismissType.MouseExit) {
+				if (
+					popoverSettings.popoverDismissEvent ===
+					PopoverDismissType.MouseExit
+				) {
 					this.clickClose();
 				}
 			});
@@ -262,8 +326,14 @@ export class DefinitionPopover extends Component {
 	}
 
 	private unregisterClosePopoverListeners() {
-		this.getActiveView()?.containerEl.removeEventListener("keypress", this.close);
-		this.getActiveView()?.containerEl.removeEventListener("click", this.clickClose);
+		this.getActiveView()?.containerEl.removeEventListener(
+			"keypress",
+			this.close,
+		);
+		this.getActiveView()?.containerEl.removeEventListener(
+			"click",
+			this.clickClose,
+		);
 
 		if (this.cmEditor) {
 			this.cmEditor.off("vim-keypress", this.close);
