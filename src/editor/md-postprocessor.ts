@@ -1,4 +1,4 @@
-import { getLinkpath, MarkdownPostProcessor } from "obsidian";
+import { MarkdownPostProcessor } from "obsidian";
 import { getDefFileManager } from "src/core/def-file-manager";
 import { getSettings } from "src/settings";
 import { DEF_DECORATION_CLS, getDecorationAttrs } from "./common";
@@ -13,7 +13,8 @@ interface Marks {
 }
 
 export const postProcessor: MarkdownPostProcessor = (element, context) => {
-	const shouldRunPostProcessor = window.NoteDefinition.settings.enableInReadingView;
+	const shouldRunPostProcessor =
+		window.NoteDefinition.settings.enableInReadingView;
 	if (!shouldRunPostProcessor) {
 		return;
 	}
@@ -27,9 +28,14 @@ export const postProcessor: MarkdownPostProcessor = (element, context) => {
 	}
 
 	rebuildHTML(element, isPopupCtx);
-}
+};
 
 const rebuildHTML = (parent: Node, isPopupCtx: boolean) => {
+	// Skip the function entirely (including recursion into node's children) to disable formatting on links
+	if (!getSettings().enableOnLinks && parent.nodeName === "A") {
+		return;
+	}
+
 	for (let i = 0; i < parent.childNodes.length; i++) {
 		const childNode = parent.childNodes[i];
 		// Replace only if TEXT_NODE
@@ -38,6 +44,7 @@ const rebuildHTML = (parent: Node, isPopupCtx: boolean) => {
 				// Ignore nodes with just a newline char
 				continue;
 			}
+
 			const lineScanner = new LineScanner();
 			const currText = childNode.textContent;
 			const phraseInfos = lineScanner.scanLine(currText);
@@ -56,26 +63,36 @@ const rebuildHTML = (parent: Node, isPopupCtx: boolean) => {
 
 			const popoverSettings = getSettings().defPopoverConfig;
 
-			phraseInfos.forEach(phraseInfo => {
+			phraseInfos.forEach((phraseInfo) => {
 				if (phraseInfo.from < currCursor) {
 					// Subset or intersect phrases are ignored
 					return;
 				}
 
-				newContainer.appendText(currText.slice(currCursor, phraseInfo.from));
+				newContainer.appendText(
+					currText.slice(currCursor, phraseInfo.from),
+				);
 
 				let span: HTMLSpanElement;
 				if (isPopupCtx && popoverSettings.enableDefinitionLink) {
-					span = getLinkDecorationSpan(newContainer, phraseInfo, currText);
+					span = getLinkDecorationSpan(
+						newContainer,
+						phraseInfo,
+						currText,
+					);
 				} else {
-					span = getNormalDecorationSpan(newContainer, phraseInfo, currText);
+					span = getNormalDecorationSpan(
+						newContainer,
+						phraseInfo,
+						currText,
+					);
 				}
 
 				newContainer.appendChild(span);
 				addedMarks.push({
 					el: span,
 					phraseInfo: phraseInfo,
-				})
+				});
 				currCursor = phraseInfo.to;
 			});
 
@@ -85,9 +102,13 @@ const rebuildHTML = (parent: Node, isPopupCtx: boolean) => {
 
 		rebuildHTML(childNode, isPopupCtx);
 	}
-}
+};
 
-function getNormalDecorationSpan(container: HTMLElement, phraseInfo: PhraseInfo, currText: string): HTMLSpanElement {
+function getNormalDecorationSpan(
+	container: HTMLElement,
+	phraseInfo: PhraseInfo,
+	currText: string,
+): HTMLSpanElement {
 	const attributes = getDecorationAttrs(phraseInfo.phrase);
 	const span = container.createSpan({
 		cls: DEF_DECORATION_CLS,
@@ -97,7 +118,11 @@ function getNormalDecorationSpan(container: HTMLElement, phraseInfo: PhraseInfo,
 	return span;
 }
 
-function getLinkDecorationSpan(container: HTMLElement, phraseInfo: PhraseInfo, currText: string): HTMLSpanElement {
+function getLinkDecorationSpan(
+	container: HTMLElement,
+	phraseInfo: PhraseInfo,
+	currText: string,
+): HTMLSpanElement {
 	const span = container.createSpan({
 		cls: DEF_LINK_DECOR_CLS,
 		text: currText.slice(phraseInfo.from, phraseInfo.to),
@@ -108,7 +133,7 @@ function getLinkDecorationSpan(container: HTMLElement, phraseInfo: PhraseInfo, c
 		if (!def) {
 			return;
 		}
-		app.workspace.openLinkText(def.linkText, '');
+		app.workspace.openLinkText(def.linkText, "");
 		// Close definition popover
 		const popover = getDefinitionPopover();
 		if (popover) {
